@@ -1,5 +1,6 @@
 ﻿using McMaster.Extensions.CommandLineUtils;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
 
@@ -42,15 +43,19 @@ namespace Sitefinity_CLI.Commands
             foreach (string dirPath in Directory.GetDirectories(templatePackageFolderPath, "*", SearchOption.AllDirectories))
                 Directory.CreateDirectory(dirPath.Replace(templatePackageFolderPath, newResourcePackagePath));
 
+            var fileToAddToProjectPaths = new List<string>();
+
             foreach (string filePath in Directory.GetFiles(templatePackageFolderPath, "*.*", SearchOption.AllDirectories))
             {
                 var newFilePath = filePath.Replace(templatePackageFolderPath, newResourcePackagePath);
                 File.Copy(filePath, filePath.Replace(templatePackageFolderPath, newResourcePackagePath));
                 this.AddSignToFile(newFilePath);
+                fileToAddToProjectPaths.Add(newFilePath);
             }
 
             Utils.WriteLine(string.Format(Constants.ResourcePackageCreatedMessage, directortyInfo.Name, newResourcePackagePath), ConsoleColor.Green);
-            Utils.WriteLine(Constants.AddFilesToProjectMessage, ConsoleColor.Yellow);
+            this.AddFilesToProject(fileToAddToProjectPaths);
+
             return 0;
         }
     }

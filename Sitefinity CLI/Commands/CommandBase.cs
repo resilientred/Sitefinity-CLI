@@ -8,6 +8,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Xml.Linq;
 
 namespace Sitefinity_CLI.Commands
 {
@@ -151,27 +152,9 @@ namespace Sitefinity_CLI.Commands
 
             File.WriteAllText(filePath, result);
             Utils.WriteLine(string.Format(Constants.FileCreatedMessage, Path.GetFileName(filePath), filePath), ConsoleColor.Green);
+            this.AddFileToProject(filePath);
+
             return 0;
-        }
-
-        private string GetLatestTemplatesVersion()
-        {
-            var templatesFolderPath = Path.Combine(this.CurrentPath, Constants.TemplatesFolderName);
-            var directoryNames = Directory.GetDirectories(templatesFolderPath);
-            List<float> versions = new List<float>();
-            CultureInfo cultureInfo = (CultureInfo)CultureInfo.CurrentCulture.Clone();
-            cultureInfo.NumberFormat.NumberDecimalSeparator = ".";
-            foreach (var name in directoryNames)
-            {
-                float version;
-                if (float.TryParse(Path.GetFileName(name), NumberStyles.Any, cultureInfo, out version))
-                {
-                    versions.Add(version);
-                }
-            }
-
-            versions.Sort();
-            return versions.Last().ToString("n1", cultureInfo);
         }
 
         protected IDictionary<string, string> GetTemplateData(string templatePath)
@@ -194,6 +177,62 @@ namespace Sitefinity_CLI.Commands
             }
 
             return data;
+        }
+
+        protected string GetProjectFilePath()
+        {
+            return Directory.GetFiles(this.ProjectRootPath, "*.csproj", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        }
+
+        protected void AddFileToProject(string filePath)
+        {
+            this.AddFilesToProject(new List<string> { filePath });
+        }
+
+        protected void AddFilesToProject(IList<string> filePaths)
+        {
+            var projectFilePath = this.GetProjectFilePath();
+            if (this.IsSitefinityProject && !string.IsNullOrEmpty(projectFilePath))
+            {
+                XDocument doc = XDocument.Load(this.GetProjectFilePath());
+                if (doc != null)
+                {
+                    var defaultNamespace = doc.Root.GetDefaultNamespace();
+                    var contentItemGroup = doc.Root.Elements(defaultNamespace + "ItemGroup").Where(g => g.Elements().First().Name == defaultNamespace + "Content").FirstOrDefault();
+                    if (contentItemGroup != null)
+                    {
+                        foreach (var filePath in filePaths)
+                        {
+                            XElement newContent = new XElement("Content", new XAttribute("Include", filePath));
+                            contentItemGroup.Add(newContent);
+                        }
+
+                        doc.Save(projectFilePath);
+                    }
+                }
+            }
+
+            Utils.WriteLine(Constants.AddFilesToProjectMessage, ConsoleColor.Yellow);
+        }
+
+        private string GetLatestTemplatesVersion()
+        {
+            var templatesFolderPath = Path.Combine(this.CurrentPath, Constants.TemplatesFolderName);
+            var directoryNames = Directory.GetDirectories(templatesFolderPath);
+            List<float> versions = new List<float>();
+            CultureInfo cultureInfo = (CultureInfo)CultureInfo.CurrentCulture.Clone();
+            cultureInfo.NumberFormat.NumberDecimalSeparator = ".";
+            foreach (var name in directoryNames)
+            {
+                float version;
+                if (float.TryParse(Path.GetFileName(name), NumberStyles.Any, cultureInfo, out version))
+                {
+                    versions.Add(version);
+                }
+            }
+
+            versions.Sort();
+            return versions.Last().ToString("n1", cultureInfo);
         }
     }
 }
